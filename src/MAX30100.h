@@ -43,7 +43,7 @@ typedef struct {
 class MAX30100 {
 public:
     MAX30100();
-    bool begin();
+    bool begin(int SCLpin = 0, int SDApin = 0);
     void setMode(Mode mode);
     void setLedsPulseWidth(LEDPulseWidth ledPulseWidth);
     void setSamplingRate(SamplingRate samplingRate);
