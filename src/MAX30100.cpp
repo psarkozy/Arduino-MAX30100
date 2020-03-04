@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include <Wire.h>
+#include <Arduino.h>
 
 #include "MAX30100.h"
 
@@ -24,10 +25,21 @@ MAX30100::MAX30100()
 {
 }
 
-bool MAX30100::begin()
+bool MAX30100::begin(int SCLpin , int SDApin)
 {
-    Wire.begin();
+    if ((SCLpin == 0 )&& (SDApin == 0))  {
+        Wire.begin();
+        }
+    else{
+      
+        Wire.begin(SDApin, SCLpin);
+        Serial.print("Manual i2c pin defs: SDA");
+        Serial.print(SDApin);
+        Serial.print(" SCL:");
+        Serial.print(SCLpin);
+    }
     Wire.setClock(I2C_BUS_SPEED);
+    Serial.println(getPartId());
 
     if (getPartId() != EXPECTED_PART_ID) {
         return false;
