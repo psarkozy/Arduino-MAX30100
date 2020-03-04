@@ -50,7 +50,7 @@ class PulseOximeter {
 public:
     PulseOximeter();
 
-    bool begin(PulseOximeterDebuggingMode debuggingMode_=PULSEOXIMETER_DEBUGGINGMODE_NONE);
+    bool begin(PulseOximeterDebuggingMode debuggingMode_=PULSEOXIMETER_DEBUGGINGMODE_NONE, int SCLpin = 0, int SDApin = 0);
     void update();
     float getHeartRate();
     uint8_t getSpO2();
@@ -59,7 +59,8 @@ public:
     void setIRLedCurrent(LEDCurrent irLedCurrent);
     void shutdown();
     void resume();
-
+    MAX30100 hrm;
+    
 private:
     void checkSample();
     void checkCurrentBias();
@@ -77,7 +78,7 @@ private:
     uint8_t redLedCurrentIndex;
     LEDCurrent irLedCurrent;
     SpO2Calculator spO2calculator;
-    MAX30100 hrm;
+
 
     void (*onBeatDetected)();
 };
