@@ -33,11 +33,11 @@ PulseOximeter::PulseOximeter() :
 {
 }
 
-bool PulseOximeter::begin(PulseOximeterDebuggingMode debuggingMode_)
+bool PulseOximeter::begin(PulseOximeterDebuggingMode debuggingMode_, int SCLpin, int SDApin)
 {
     debuggingMode = debuggingMode_;
 
-    bool ready = hrm.begin();
+    bool ready = hrm.begin(SCLpin,SDApin);
 
     if (!ready) {
         if (debuggingMode != PULSEOXIMETER_DEBUGGINGMODE_NONE) {
