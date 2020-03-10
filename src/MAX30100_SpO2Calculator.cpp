@@ -33,29 +33,43 @@ SpO2Calculator::SpO2Calculator() :
     samplesRecorded(0),
     spO2(0)
 {
+      for (int i = 0; i < AC_BUFFER_SIZE; i++){
+      irACValues[i] = 0;
+      redACValues[i] = 0;
+      }
 }
 
 void SpO2Calculator::update(float irACValue, float redACValue, bool beatDetected)
 {
-    irACValueSqSum += irACValue * irACValue;
-    redACValueSqSum += redACValue * redACValue;
-    ++samplesRecorded;
+    irACValues[ACptr] = irACValue;
+    redACValues[ACptr] = redACValue;
+    ACptr++;
+    if (ACptr == AC_BUFFER_SIZE) ACptr = 0;  
+    
+    samplesRecorded++;
+  
+    if (ACptr%10 == 0){
+      irACValueSqSum = 0;
+      redACValueSqSum = 0;
+      for (int i = 0; i < AC_BUFFER_SIZE;i++){
+        irACValueSqSum += irACValues[i] * irACValues[i];
+        redACValueSqSum += redACValues[i] * redACValues[i]; 
+      }
+      float acSqRatio = 100.0 * log(redACValueSqSum/AC_BUFFER_SIZE) / log(irACValueSqSum/AC_BUFFER_SIZE); //no need to sqrt as it cancels out anyway
+      uint8_t index = 0;
+
+      if (acSqRatio > 66) {
+          index = (uint8_t)acSqRatio - 66;
+      } else if (acSqRatio > 50) {
+          index = (uint8_t)acSqRatio - 50;
+      }
+      spO2 = spO2LUT[index];
+
+    }
+
 
     if (beatDetected) {
         ++beatsDetectedNum;
-        if (beatsDetectedNum == CALCULATE_EVERY_N_BEATS) {
-            float acSqRatio = 100.0 * log(redACValueSqSum/samplesRecorded) / log(irACValueSqSum/samplesRecorded);
-            uint8_t index = 0;
-
-            if (acSqRatio > 66) {
-                index = (uint8_t)acSqRatio - 66;
-            } else if (acSqRatio > 50) {
-                index = (uint8_t)acSqRatio - 50;
-            }
-            reset();
-
-            spO2 = spO2LUT[index];
-        }
     }
 }
 
@@ -66,6 +80,11 @@ void SpO2Calculator::reset()
     irACValueSqSum = 0;
     beatsDetectedNum = 0;
     spO2 = 0;
+    for (int i = 0; i < AC_BUFFER_SIZE; i++){
+      irACValues[i] = 0;
+      redACValues[i] = 0;
+    }
+    ACptr = 0;
 }
 
 uint8_t SpO2Calculator::getSpO2()
