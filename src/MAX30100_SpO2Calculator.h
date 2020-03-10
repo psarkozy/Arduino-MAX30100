@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdint.h>
 
 #define CALCULATE_EVERY_N_BEATS         3
+#define AC_BUFFER_SIZE 512
 
 class SpO2Calculator {
 public:
@@ -33,7 +34,9 @@ public:
 
 private:
     static const uint8_t spO2LUT[43];
-
+    float irACValues[AC_BUFFER_SIZE];
+    float redACValues[AC_BUFFER_SIZE];
+    uint32_t ACptr = 0;
     float irACValueSqSum;
     float redACValueSqSum;
     uint8_t beatsDetectedNum;
