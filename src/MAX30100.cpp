@@ -31,15 +31,14 @@ bool MAX30100::begin(int SCLpin , int SDApin)
         Wire.begin();
         }
     else{
-      
         Wire.begin(SDApin, SCLpin);
         Serial.print("Manual i2c pin defs: SDA");
         Serial.print(SDApin);
         Serial.print(" SCL:");
-        Serial.print(SCLpin);
+        Serial.println(SCLpin);
     }
     Wire.setClock(I2C_BUS_SPEED);
-    Serial.println(getPartId());
+    //Serial.println(getPartId());
 
     if (getPartId() != EXPECTED_PART_ID) {
         return false;
@@ -74,6 +73,8 @@ void MAX30100::setSamplingRate(SamplingRate samplingRate)
 void MAX30100::setLedsCurrent(LEDCurrent irLedCurrent, LEDCurrent redLedCurrent)
 {
     writeRegister(MAX30100_REG_LED_CONFIGURATION, redLedCurrent << 4 | irLedCurrent);
+    led_current = redLedCurrent;
+    irled_current = irLedCurrent;
 }
 
 void MAX30100::setHighresModeEnabled(bool enabled)
@@ -86,18 +87,26 @@ void MAX30100::setHighresModeEnabled(bool enabled)
     }
 }
 
-void MAX30100::update()
+uint8_t MAX30100::update()
 {
-    readFifoData();
+    return readFifoData();
 }
 
 bool MAX30100::getRawValues(uint16_t *ir, uint16_t *red)
 {
     if (!readoutsBuffer.isEmpty()) {
-        SensorReadout readout = readoutsBuffer.pop();
-
-        *ir = readout.ir;
-        *red = readout.red;
+        if (discard_for_temperature_reading == 0){
+            SensorReadout readout = readoutsBuffer.pop();
+            *ir = readout.ir;
+            *red = readout.red;
+            last_stable_temperature_irled = readout.ir;
+            last_stable_temperature_redled = readout.red;
+        }else{
+            SensorReadout readout = readoutsBuffer.pop();
+            *ir = last_stable_temperature_irled;
+            *red = last_stable_temperature_redled;
+            discard_for_temperature_reading --;
+        }
 
         return true;
     } else {
@@ -143,7 +152,7 @@ void MAX30100::burstRead(uint8_t baseAddress, uint8_t *buffer, uint8_t length)
     }
 }
 
-void MAX30100::readFifoData()
+uint8_t MAX30100::readFifoData()
 {
     uint8_t buffer[MAX30100_FIFO_DEPTH*4];
     uint8_t toRead;
@@ -153,17 +162,20 @@ void MAX30100::readFifoData()
     if (toRead) {
         burstRead(MAX30100_REG_FIFO_DATA, buffer, 4 * toRead);
 
-        for (uint8_t i=0 ; i < toRead ; ++i) {
+        //for (uint8_t i=0 ; i < toRead ; ++i) { // this results in a wrong read order for the buffer!
+        for (int i= toRead-1 ; i >=0; i--) {
             // Warning: the values are always left-aligned
             readoutsBuffer.push({
                     .ir=(uint16_t)((buffer[i*4] << 8) | buffer[i*4 + 1]),
                     .red=(uint16_t)((buffer[i*4 + 2] << 8) | buffer[i*4 + 3])});
         }
     }
+    return toRead;
 }
 
-void MAX30100::startTemperatureSampling()
+void MAX30100::startTemperatureSampling(uint8_t discard_after_temperature)
 {
+    discard_for_temperature_reading = discard_after_temperature;
     uint8_t modeConfig = readRegister(MAX30100_REG_MODE_CONFIGURATION);
     modeConfig |= MAX30100_MC_TEMP_EN;
 
