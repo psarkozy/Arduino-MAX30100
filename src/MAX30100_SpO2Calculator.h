@@ -1,3 +1,5 @@
+
+
 /*
 Arduino-MAX30100 oximetry / heart rate integrated sensor library
 Copyright (C) 2016  OXullo Intersecans <x@brainrapers.org>
@@ -31,6 +33,7 @@ public:
     void update(float irACValue, float redACValue, bool beatDetected);
     void reset();
     uint8_t getSpO2();
+    float getacSqRatio();
 
 private:
     static const uint8_t spO2LUT[43];
@@ -42,6 +45,7 @@ private:
     uint8_t beatsDetectedNum;
     uint32_t samplesRecorded;
     uint8_t spO2;
+    float acSqRatio = 0;
 };
 
 #endif
