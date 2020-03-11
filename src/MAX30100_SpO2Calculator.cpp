@@ -51,11 +51,13 @@ void SpO2Calculator::update(float irACValue, float redACValue, bool beatDetected
     if (ACptr%10 == 0){
       irACValueSqSum = 0;
       redACValueSqSum = 0;
-      for (int i = 0; i < AC_BUFFER_SIZE;i++){
+      int actual_samples = AC_BUFFER_SIZE;
+      if (samplesRecorded < actual_samples) actual_samples = samplesRecorded;
+      for (int i = 0; i<actual_samples;i++){
         irACValueSqSum += irACValues[i] * irACValues[i];
         redACValueSqSum += redACValues[i] * redACValues[i]; 
       }
-      float acSqRatio = 100.0 * log(redACValueSqSum/AC_BUFFER_SIZE) / log(irACValueSqSum/AC_BUFFER_SIZE); //no need to sqrt as it cancels out anyway
+      acSqRatio = 100.0 * log(redACValueSqSum/actual_samples) / log(irACValueSqSum/actual_samples); //no need to sqrt as it cancels out anyway
       uint8_t index = 0;
 
       if (acSqRatio > 66) {
@@ -90,4 +92,9 @@ void SpO2Calculator::reset()
 uint8_t SpO2Calculator::getSpO2()
 {
     return spO2;
+}
+
+float SpO2Calculator::getacSqRatio()
+{
+    return acSqRatio;
 }
