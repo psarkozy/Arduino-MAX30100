@@ -42,7 +42,8 @@ typedef enum PulseOximeterDebuggingMode {
     PULSEOXIMETER_DEBUGGINGMODE_NONE,
     PULSEOXIMETER_DEBUGGINGMODE_RAW_VALUES,
     PULSEOXIMETER_DEBUGGINGMODE_AC_VALUES,
-    PULSEOXIMETER_DEBUGGINGMODE_PULSEDETECT
+    PULSEOXIMETER_DEBUGGINGMODE_PULSEDETECT,
+    PULSEOXIMETER_DEBUGGINGMODE_FULL
 } PulseOximeterDebuggingMode;
 
 
@@ -51,15 +52,19 @@ public:
     PulseOximeter();
 
     bool begin(PulseOximeterDebuggingMode debuggingMode_=PULSEOXIMETER_DEBUGGINGMODE_NONE, int SCLpin = 0, int SDApin = 0);
-    void update();
+    uint8_t update();
     float getHeartRate();
     uint8_t getSpO2();
     uint8_t getRedLedCurrentBias();
+    float getacSqRatio();
     void setOnBeatDetectedCallback(void (*cb)());
     void setIRLedCurrent(LEDCurrent irLedCurrent);
     void shutdown();
+    uint32_t discard();
     void resume();
     MAX30100 hrm;
+    uint8_t redLedCurrentIndex;
+    LEDCurrent irLedCurrent;
     
 private:
     void checkSample();
@@ -75,8 +80,6 @@ private:
     DCRemover irDCRemover;
     DCRemover redDCRemover;
     FilterBuLp1 lpf;
-    uint8_t redLedCurrentIndex;
-    LEDCurrent irLedCurrent;
     SpO2Calculator spO2calculator;
 
 
