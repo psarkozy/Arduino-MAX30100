@@ -57,12 +57,13 @@ bool PulseOximeter::begin(PulseOximeterDebuggingMode debuggingMode_, int SCLpin,
     return true;
 }
 
-void PulseOximeter::update()
+uint8_t PulseOximeter::update()
 {
-    hrm.update();
+    uint8_t num_samples = hrm.update();
 
     checkSample();
     checkCurrentBias();
+    return num_samples;
 }
 
 float PulseOximeter::getHeartRate()
@@ -73,6 +74,11 @@ float PulseOximeter::getHeartRate()
 uint8_t PulseOximeter::getSpO2()
 {
     return spO2calculator.getSpO2();
+}
+
+float PulseOximeter::getacSqRatio()
+{
+    return spO2calculator.getacSqRatio();
 }
 
 uint8_t PulseOximeter::getRedLedCurrentBias()
@@ -101,25 +107,47 @@ void PulseOximeter::resume()
     hrm.resume();
 }
 
+uint32_t PulseOximeter::discard(){
+    uint16_t rawIRValue = 0;
+    uint16_t rawRedValue = 0;
+    uint32_t timeout = millis() + 100;
+    uint32_t discarded_samples = 0;
+    // Dequeue all available samples, they're properly timed by the HRM
+    discarded_samples = hrm.readFifoData();
+    while (hrm.getRawValues(&rawIRValue, &rawRedValue) || (millis() > timeout)){
+    };
+    if (debuggingMode != PULSEOXIMETER_DEBUGGINGMODE_NONE){
+        Serial.print("POX Discarded ");
+        Serial.println(discarded_samples);
+    }
+    return discarded_samples;
+}
+
 void PulseOximeter::checkSample()
 {
     uint16_t rawIRValue, rawRedValue;
+    float irACValue = 0;
+    float redACValue = 0;
+    float filteredPulseValue = 0;
+    bool beatDetected = false;
+    int numvaluesread = 0;
 
     // Dequeue all available samples, they're properly timed by the HRM
     while (hrm.getRawValues(&rawIRValue, &rawRedValue)) {
-        float irACValue = irDCRemover.step(rawIRValue);
-        float redACValue = redDCRemover.step(rawRedValue);
-
+        numvaluesread ++;
+        irACValue = irDCRemover.step(rawIRValue);
+        redACValue = redDCRemover.step(rawRedValue);
         // The signal fed to the beat detector is mirrored since the cleanest monotonic spike is below zero
-        float filteredPulseValue = lpf.step(-irACValue);
-        bool beatDetected = beatDetector.addSample(filteredPulseValue);
+        filteredPulseValue = lpf.step(-irACValue);
+        beatDetected = beatDetector.addSample(filteredPulseValue);
 
+
+        spO2calculator.update(irACValue, redACValue, beatDetected);
         if (beatDetector.getRate() > 0) {
             state = PULSEOXIMETER_STATE_DETECTING;
-            spO2calculator.update(irACValue, redACValue, beatDetected);
         } else if (state == PULSEOXIMETER_STATE_DETECTING) {
-            state = PULSEOXIMETER_STATE_IDLE;
-            spO2calculator.reset();
+            //state = PULSEOXIMETER_STATE_IDLE;
+            //spO2calculator.reset();
         }
 
         switch (debuggingMode) {
@@ -143,6 +171,22 @@ void PulseOximeter::checkSample()
                 Serial.print(",");
                 Serial.println(beatDetector.getCurrentThreshold());
                 break;
+            case PULSEOXIMETER_DEBUGGINGMODE_FULL:
+                Serial.print("R\t");
+                Serial.print((int)rawIRValue);
+                Serial.print("\t");
+                Serial.print((int)rawRedValue);
+                Serial.print("\t");
+                Serial.print((int)irACValue);
+                Serial.print("\t");
+                Serial.print((int)redACValue);
+                Serial.print("\t");
+                Serial.print((int)filteredPulseValue);
+                Serial.print("\t");
+                Serial.print((int)beatDetector.getCurrentThreshold());
+                Serial.print("\t");
+                Serial.println((int) 100* spO2calculator.getacSqRatio());
+                break;
 
             default:
                 break;
@@ -158,6 +202,7 @@ void PulseOximeter::checkCurrentBias()
 {
     // Follower that adjusts the red led current in order to have comparable DC baselines between
     // red and IR leds. The numbers are really magic: the less possible to avoid oscillations
+
     if (millis() - tsLastBiasCheck > CURRENT_ADJUSTMENT_PERIOD_MS) {
         bool changed = false;
         if (irDCRemover.getDCW() - redDCRemover.getDCW() > 70000 && redLedCurrentIndex < MAX30100_LED_CURR_50MA) {
@@ -166,15 +211,39 @@ void PulseOximeter::checkCurrentBias()
         } else if (redDCRemover.getDCW() - irDCRemover.getDCW() > 70000 && redLedCurrentIndex > 0) {
             --redLedCurrentIndex;
             changed = true;
+        } 
+        if (redDCRemover.getlongtermDC()<4048 && redLedCurrentIndex <15 ) {
+            redLedCurrentIndex++;
+            changed = true;
         }
+        if (redDCRemover.getlongtermDC()>60000 && redLedCurrentIndex > 1 ) {
+            redLedCurrentIndex--;
+            changed = true;
+        }
+        if (irDCRemover.getlongtermDC()<4048 && ((uint8_t) irLedCurrent) < 15) {
+            irLedCurrent = (LEDCurrent) (((uint8_t) irLedCurrent)+1);
+            changed = true;
+        }
+        if (irDCRemover.getlongtermDC()>60000 && ((uint8_t) irLedCurrent) > 1) {
+            irLedCurrent = (LEDCurrent) (((uint8_t) irLedCurrent)-1);
+            changed = true;
+        }
+    
 
         if (changed) {
+            spO2calculator.reset();
             hrm.setLedsCurrent(irLedCurrent, (LEDCurrent)redLedCurrentIndex);
             tsLastCurrentAdjustment = millis();
 
             if (debuggingMode != PULSEOXIMETER_DEBUGGINGMODE_NONE) {
-                Serial.print("I:");
-                Serial.println(redLedCurrentIndex);
+                Serial.print("Changing LED current to RED_dc:");
+                Serial.print(redLedCurrentIndex );
+                Serial.print(" IR_dc:");
+                Serial.print(irLedCurrent );
+                Serial.print(" redDCRemover.getDCW():");
+                Serial.print(redDCRemover.getDCW() );
+                Serial.print(" irDCRemover.getDCW():");
+                Serial.println(irDCRemover.getDCW() );
             }
         }
 
