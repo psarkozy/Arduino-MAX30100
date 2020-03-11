@@ -46,10 +46,10 @@ class  FilterBuLp1
 class DCRemover
 {
 public:
-	DCRemover() : alpha(0), dcw(0)
+	DCRemover() : alpha(0), dcw(0), longtermDC(0)
 	{
 	}
-	DCRemover(float alpha_) : alpha(alpha_), dcw(0)
+	DCRemover(float alpha_) : alpha(alpha_), dcw(0), longtermDC(0)
 	{
 	}
 
@@ -57,7 +57,7 @@ public:
 	{
 		float olddcw = dcw;
 		dcw = (float)x + alpha * dcw;
-
+		longtermDC = 0.98*longtermDC + 0.02*x;
 		return dcw - olddcw;
 	}
 
@@ -65,10 +65,14 @@ public:
 	{
 		return dcw;
 	}
+	float getlongtermDC(){
+		return longtermDC;
+	}
 
 private:
-	float alpha;
-	float dcw;
+	float alpha=0;
+	float dcw =0;
+	float longtermDC = 0;
 };
 
 #endif
