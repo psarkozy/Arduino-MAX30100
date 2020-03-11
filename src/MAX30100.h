@@ -49,23 +49,28 @@ public:
     void setSamplingRate(SamplingRate samplingRate);
     void setLedsCurrent(LEDCurrent irLedCurrent, LEDCurrent redLedCurrent);
     void setHighresModeEnabled(bool enabled);
-    void update();
+    uint8_t update();
     bool getRawValues(uint16_t *ir, uint16_t *red);
     void resetFifo();
-    void startTemperatureSampling();
+    void startTemperatureSampling(uint8_t discard_after_temperature = 18);
     bool isTemperatureReady();
     float retrieveTemperature();
     void shutdown();
     void resume();
     uint8_t getPartId();
-
+    uint8_t led_current = 0;
+    uint8_t irled_current = 0;
+    uint8_t readFifoData();
+    uint8_t discard_for_temperature_reading = 0;
+    uint16_t last_stable_temperature_irled = 0;
+    uint16_t last_stable_temperature_redled = 0;
 private:
     CircularBuffer<SensorReadout, RINGBUFFER_SIZE> readoutsBuffer;
 
     uint8_t readRegister(uint8_t address);
     void writeRegister(uint8_t address, uint8_t data);
     void burstRead(uint8_t baseAddress, uint8_t *buffer, uint8_t length);
-    void readFifoData();
+
 };
 
 #endif
